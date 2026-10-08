@@ -7,16 +7,19 @@ forever (1) on unbounded input.
 
 > It will dedupe as best it can but it won't crash your system.
 
-(1) Technically not _forever_. It can process up to `u64::MAX` lines, but even at a rate of 1
-billion lines/second this is still 580 years. I think that counts as forever.
+(1) Technically not _forever_. Entries are timestamped in milliseconds since startup as a `u64`,
+which runs out after about 580 million years. I think that counts as forever.
 
 ## Usage
 
 ```
-asuniq [capacity] < input > output
+asuniq [--ttl SECONDS] [CAPACITY] < input > output
 ```
 
-`capacity` is the number of distinct lines to remember. It defaults to 16384 and is rounded up to
+`--ttl` lets a line be printed again once it has gone unseen for that many seconds. Without it,
+lines are remembered until something else needs their slot.
+
+`CAPACITY` is the number of distinct lines to remember. It defaults to 16384 and is rounded up to
 the next power of two. Memory use is 32 bytes per unit of capacity, allocated once at startup:
 
 | capacity  | memory |
@@ -25,7 +28,7 @@ the next power of two. Memory use is 32 bytes per unit of capacity, allocated on
 | 1048576   | 32 MB  |
 | 4194304   | 128 MB |
 
-Non-numeric values are currently ignored and the default is used.
+Invalid arguments are an error (exit status 2) rather than falling back to defaults.
 
 Install from a checkout with `cargo install --path .`.
 
@@ -35,6 +38,12 @@ Each line is printed the first time it is seen, byte for byte and in input order
 dropped as long as the line is still remembered. The trailing `\n` is not part of the comparison,
 but everything else is, so `a` and `a\r` are different lines.
 
+With `--ttl`, a line expires once it has gone unseen for longer than the TTL, and its next copy is
+printed again. Every copy refreshes the timer, including the ones that are dropped, so a line that
+keeps showing up stays suppressed and only reprints after a quiet gap. For example, with
+`--ttl 3600` a user who hits your app all day is logged once, and logged again only after an hour
+away.
+
 Output is flushed after every read from stdin, so lines show up as soon as they arrive when the
 input is live (`tail -f | asuniq`). If the downstream reader closes the pipe (`asuniq | head`),
 asuniq exits quietly with status 0.
@@ -42,28 +51,34 @@ asuniq exits quietly with status 0.
 ### Eviction
 
 asuniq stores a 64-bit hash of each line, not the line itself, in a fixed-size open addressing
-table that is twice the capacity. Each entry also records when it was last seen, measured in lines
-processed.
+table that is twice the capacity. Each entry also records when it was last seen, in milliseconds
+since startup. The clock is read once per read from stdin, so lines that arrive together share a
+timestamp.
 
-A lookup scans up to 16 slots starting from the hash's home slot. If it finds the hash, the line is
-a duplicate and its timestamp is refreshed. If it finds an empty slot, the line is new and is
-stored there. If all 16 slots are taken by other lines, the least recently seen of those 16 is
-evicted to make room.
+A lookup scans up to 16 slots starting from the hash's home slot. If it finds the hash, its
+timestamp is refreshed, and the line is a duplicate unless it was last seen longer than the TTL
+ago. If it finds an empty slot, the line is new and is stored there. If all 16 slots are taken by
+other lines, the least recently seen of those 16 is evicted to make room.
+
+The TTL and the eviction order use the same timestamp, so expired lines are always the first to be
+evicted. Evicting an expired line costs nothing, since it would have printed again anyway.
 
 Some consequences:
 
 - This is LRU within a 16-slot window, not across the whole table. A recently seen line can be
   evicted while older lines elsewhere survive, so an occasional duplicate gets through even when
   the table is far from full.
-- There is no TTL. A line is only forgotten when something else needs its slot. On a quiet stream
+- Without `--ttl`, a line is only forgotten when something else needs its slot. On a quiet stream
   a line can stay suppressed indefinitely.
 - Two different lines with the same 64-bit hash are treated as the same line. With millions of
   distinct lines the odds of any collision are around one in ten million.
 
 ### Tuning
 
-Set capacity to about twice the number of distinct lines you expect to see within the window you
-care about. Measured on 10M lines with about 2M distinct values:
+Set capacity to about twice the number of distinct lines you expect to be active at once: within
+one TTL if you use `--ttl`, or over the whole run if you don't. With a TTL, a stream whose distinct
+lines keep growing forever can still be deduplicated exactly, as long as the set active within one
+TTL fits. Measured without a TTL on 10M lines with about 2M distinct values:
 
 | capacity | table load | extra duplicates emitted |
 | -------- | ---------- | ------------------------ |

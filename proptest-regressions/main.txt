@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 6f43b13e1265f28eba251fb52fd2e164b1f0ea69e461d3ca696b532abe6da868 # shrinks to input = [97, 97, 10, 97, 97, 10, 10, 10, 10, 13, 10, 97, 10, 10, 10, 10, 10, 97, 97, 10, 10, 13, 10, 10, 10, 13, 10, 97, 97, 10, 13, 97, 97, 13, 98, 97, 98, 98, 13, 97, 98, 97, 98, 97, 97, 97, 98, 98, 10, 10, 10, 10, 10, 10, 10, 10, 98, 10, 10, 10, 10, 10, 98, 10, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97], chunk_size = 1
+cc ca8376120f5f0cfcb40d8e0d951ac864474b7af75ac9984630999cce42de1617 # shrinks to events = [(7, 0), (0, 7), (0, 3), (0, 1), (7, 0), (0, 5), (7, 1)], ttl = 5
