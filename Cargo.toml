@@ -9,3 +9,6 @@ rapidhash = "4.5"
 
 [dev-dependencies]
 proptest = "1.11.0"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }

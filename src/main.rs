@@ -31,6 +31,10 @@ impl ArenaCache {
     fn check_and_update(&mut self, hash: u64) -> bool {
         self.counter += 1;
         // High-bit mixing to map the 64-bit hash into our slot index
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "only the low bits survive the mask anyway"
+        )]
         let mut idx = (hash as usize) & self.mask;
 
         let mut lowest_counter = u64::MAX;
@@ -84,7 +88,7 @@ trait StreamHasher {
 // Implement Strategy 1: Rapidhash v3 Inline Engine
 struct RapidHasher;
 impl StreamHasher for RapidHasher {
-    #[inline(always)]
+    #[inline]
     fn hash(bytes: &[u8]) -> u64 {
         // Bypasses std::hash object traits completely for maximum speed
         rapidhash::v3::rapidhash_v3_inline::<true, false, false>(
