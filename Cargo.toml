@@ -1,0 +1,11 @@
+[package]
+name = "asuniq"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+memchr = "2.8.3"
+rapidhash = "4.5"
+
+[dev-dependencies]
+proptest = "1.11.0"
